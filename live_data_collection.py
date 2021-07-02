@@ -16,8 +16,8 @@ import zlib
 class bilibili_live_data:
     """
     该类实现了以下几个功能
-    1.自动监控某直播间的开播情况
-    2.根据输入时间表监控直播间的直播情况
+    1.输入room_id获取该room_id下的直播消息流
+    2.将上述消息流存入mysql
     """
 
     def __init__(self, room_id):
@@ -85,7 +85,11 @@ class bilibili_live_data:
         # 上次接收粉丝变动报文时的粉丝团数
         self.latest_medal_fans = 0
 
+        # 心跳
         self.latest_heart_beat_time = time.time()
+
+        # 直播间判别
+        self.live_status = 'preparing'
 
     # 监控直播间
     def live_monitor(self):
@@ -178,12 +182,18 @@ class bilibili_live_data:
         if ver == 0:
             try:
                 py_data = json.loads(data[16:].decode('utf-8', errors='ignore'))
-                sql_flag = 1
+                uid = ''
+                user_name = ''
+                room_id_of_medal = ''
+                level_of_medal = 0
+                msg_type = ''
+                time_stamp = ''
                 text = ''
                 ul = -1
                 sc_price = 0
                 gift_ID = 0
                 fans_type = 0
+                sql_flag = 1
                 if py_data['cmd'] == "DANMU_MSG:4:0:2:2:2:0" or py_data['cmd'] == "DANMU_MSG":
                     uid = py_data['info'][2][0]
                     user_name = py_data['info'][2][1]
@@ -304,6 +314,19 @@ class bilibili_live_data:
                     else:
                         self.new_fans_flag = 0
                         text = "程序运行前有%s个粉丝，%s个粉丝团" % (self.before_fans, self.before_medal_fans)
+                elif py_data['cmd'] == 'ROOM_CHANGE' or py_data['cmd'] == 'LIVE' or py_data['cmd'] == 'PREPARING':
+                    if self.live_status == 'preparing' and py_data['cmd'] == 'LIVE':
+                        self.live_status = 'live'
+                        uid = 'start'
+                        print('[Notice] live start')
+                    elif self.live_status == 'live' and py_data['cmd'] == 'PREPARING':
+                        self.live_status = 'preparing'
+                        uid = 'end'
+                        # self.__send_live_analysis()
+                        print('[Notice] live end')
+                    else:
+                        sql_flag = 0
+                    time_stamp = lf.ts2date(time.time())
                 else:
                     sql_flag = 0
                 if sql_flag == 1:
@@ -364,6 +387,7 @@ class bilibili_live_data:
                      "CHARSET=utf8" % table_name
         self.mysql_conn.cursor().execute(create_sql)
 
+    # 向外发送生成直播小结的消息
+    # def __send_live_analysis(self):
 
-test = bilibili_live_data('14939883')
-test.live_monitor()
+
