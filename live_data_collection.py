@@ -88,17 +88,18 @@ class bilibili_live_data:
         # 心跳
         self.latest_heart_beat_time = time.time()
 
-        # 直播间判别
+        # 直播间状态判别
         self.live_status = 'preparing'
+
+        # 当前日期值
+        self.now_day = lf.get_time().tm_mday
 
     # 监控直播间
     def live_monitor(self):
         self.__create_dm_sql(table_name=self.sql_road_dm)
         self.__create_rq_sql(table_name=self.sql_road_rq)
         self.mysql_conn.commit()
-        # 监听获取弹幕
         try:
-            # 获取事件循环
             asyncio.get_event_loop().run_until_complete(self.__listen_live_room())
         except KeyboardInterrupt as exc:
             print("Quit.")
@@ -107,9 +108,7 @@ class bilibili_live_data:
     async def __listen_live_room(self):
         async with AioWebSocket(self.url) as aws:
             converse = aws.manipulator
-            # 发送一个连接请求
             await converse.send(bytes.fromhex(self.data_raw))
-            # 任务list
             tasks = [self.__rece_data_packet(converse), self.__send_heartbeat(converse, aws)]
             await asyncio.wait(tasks)
 
@@ -118,7 +117,7 @@ class bilibili_live_data:
         # 发送一个心跳防止被断开连接
         while True:
             await asyncio.sleep(self.heartbeat_time)
-            # 发送一个心跳包给服务器
+            self.__judge_new_day()
             if time.time() - self.latest_heart_beat_time > self.heartbeat_time + self.error_time:
                 tasks = [aws.close_connection(), self.__listen_live_room()]
                 print('[Notice] try reconnect')
@@ -169,6 +168,11 @@ class bilibili_live_data:
         room_id_of_medal: b站的纯消息流的medal_id是room的id，舰团消息却是uid，很奇怪
         level_of_medal:当前携带的粉丝牌的等级
         msg_type:消息的类型
+            danmu:弹幕消息
+            sc:sc消息
+            entry:进入消息
+            gift:送礼物，连击礼物消息
+            guard:舰团消息
         time_stamp:消息的时间戳，如果该消息是不携带时间戳类型的消息取本地的时间戳
         text:消息的文本内容
         ul:如果消息中携带直播等级，记录，不携带不记录
@@ -233,7 +237,7 @@ class bilibili_live_data:
                     user_name = py_data['data']['uname']
                     room_id_of_medal = py_data['data']['medal_info']['target_id']
                     level_of_medal = py_data['data']['medal_info']['medal_level']
-                    msg_type = "single_gift"
+                    msg_type = "gift"
                     time_stamp = lf.ts2date(py_data['data']['timestamp'])
                     text = py_data['data']['giftName']
                     gift_ID = py_data['data']['giftId']
@@ -247,9 +251,10 @@ class bilibili_live_data:
                     user_name = py_data['data']['uname']
                     room_id_of_medal = py_data['data']['medal_info']['target_id']
                     level_of_medal = py_data['data']['medal_info']['medal_level']
-                    msg_type = "muti_gift"
+                    msg_type = "gift"
                     time_stamp = lf.ts2date(time.time())
-                    text = py_data['data']['gift_name'] + " * " + py_data['data']['combo_num']
+                    temp = " * %d" % py_data['data']['batch_combo_num']
+                    text = py_data['data']['gift_name'] + temp
                     gift_ID = py_data['data']['gift_id']
                     if room_id_of_medal in self.medal_list:
                         fans_type = 1
@@ -261,7 +266,7 @@ class bilibili_live_data:
                     user_name = py_data['data']['username']
                     room_id_of_medal = 0
                     level_of_medal = 0
-                    msg_type = 4
+                    msg_type = 'guard'
                     time_stamp = lf.ts2date(py_data['data']['start_time'])
                     if py_data['cmd'] == 'USER_TOAST_MSG':
                         text = py_data['data']['gift_name'] + '138'
@@ -387,7 +392,23 @@ class bilibili_live_data:
                      "CHARSET=utf8" % table_name
         self.mysql_conn.cursor().execute(create_sql)
 
+    def __judge_new_day(self):
+        now_day = lf.get_time().tm_mday
+        if self.now_day != now_day:
+            print('new day!')
+            self.now_day = now_day
+            self.sql_road_dm = self.config['mysql_config']['sql_sentence']['dm_road'] % \
+                               (lf.get_time().tm_year, lf.get_time().tm_mon, lf.get_time().tm_mday, self.room_id)
+            self.dm_insert_sql_model = "Insert into " + self.sql_road_dm + " " + \
+                                       self.config['mysql_config']['sql_sentence']['dm_values']
+
+            self.sql_road_rq = self.config['mysql_config']['sql_sentence']['rq_road'] % \
+                               (lf.get_time().tm_year, lf.get_time().tm_mon, lf.get_time().tm_mday, self.room_id)
+            self.rq_insert_sql_model = "Insert into " + self.sql_road_rq + " " + \
+                                       self.config['mysql_config']['sql_sentence']['rq_values']
+            self.__create_rq_sql(self.sql_road_rq)
+            self.__create_dm_sql(self.sql_road_dm)
+
+
     # 向外发送生成直播小结的消息
     # def __send_live_analysis(self):
-
-
