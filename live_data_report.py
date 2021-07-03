@@ -4,7 +4,8 @@
 """
 import pymysql
 import live_function as lf
-import  live_cut_word as lcw
+import live_cut_word as lcw
+import make_picture as mp
 
 
 class live_analysis:
@@ -106,10 +107,57 @@ class live_analysis:
                 live_flag = 'not_live'
 
         #  1.生成直播小结
-        # self.__everyday_live_stats(default_time, live_data_group_by_id, every_day_table_name)
-        TODO
+        self.__everyday_live_stats(default_time, live_data_group_by_id)
+
         # 2.生成词频图 词云图
-        word_freq_dic = lcw.get_word_freq_dic(live_data_group_by_type)
+        self.__wordfreq_wordcloud(live_data_group_by_type)
+
+        # 3.生成舰长图、礼物图、粉丝图、进入图、营收图、同接图、sc图、弹幕图
+        self.__make_stats_picture(all_data)
+
+    # 生成各种图片
+    def __make_stats_picture(self, my_all_data):
+        """
+        :param my_all_data:所有数据
+        :return: 输出图片
+        """
+        stats_list = mp.get_min_avg_data(my_all_data)
+        new_stats_list = {'gift': [], 'danmu': [], 'sc': [], 'guard': [],
+                          'entry': [], 'revenue': [], 'new_fans': [], 'new_medal_fans': [], 'simu_interact': []}
+        for min_stats in stats_list.__iter__():
+            for my_type, num in min_stats.items():
+                new_stats_list[my_type].append(num)
+        # 礼物图   1mins
+        mp.make_min_picture(new_stats_list['gift'], 1, '送礼人次', self.live_road, 1)
+        # 弹幕图   1mins
+        mp.make_min_picture(new_stats_list['danmu'], 1, '弹幕数量', self.live_road, 1)
+        # sc图    3mins
+        sc_data = mp.trans_mins_sum(1, 3, new_stats_list['sc'])
+        mp.make_min_picture(sc_data, 3, 'sc数量', self.live_road, 1)
+        # guard图 3mins
+        guard_data = mp.trans_mins_sum(1, 3, new_stats_list['guard'])
+        mp.make_min_picture(guard_data, 3, '舰团数量', self.live_road, 1)
+        # entry图 1mins
+        mp.make_min_picture(new_stats_list['entry'], 1, '入场人次', self.live_road, 1)
+        # 营收图   1mins
+        mp.make_min_picture(new_stats_list['revenue'], 1, '营收', self.live_road, 1)
+        # fans图  3mins
+        new_fans_data = mp.trans_mins_sum(1, 3, new_stats_list['new_fans'])
+        mp.make_min_picture(new_fans_data, 3, '新增粉丝', self.live_road, 1)
+        # 粉丝团图 3mins
+        new_medal_fans_data = mp.trans_mins_sum(1, 3, new_stats_list['new_medal_fans'])
+        mp.make_min_picture(new_medal_fans_data, 3, '新增粉丝团', self.live_road, 1)
+        # 同接图   1mins
+        mp.make_min_picture(new_stats_list['simu_interact'], 1, '10分钟同接', self.live_road, 0)
+
+    # 词频、词云图生成
+    def __wordfreq_wordcloud(self, my_live_data_group_by_type):
+        """
+
+        :param my_live_data_group_by_type: 根据类型分类的消息数据
+        :return: 生成词频图和词云图
+        """
+        word_freq_dic = lcw.get_word_freq_dic(my_live_data_group_by_type)
         word_freq_bar_num = 20
         word_freq_bar_dict = lcw.customize_word_freq_dict(word_freq_dic, word_freq_bar_num)
         lcw.make_word_freq_bar(word_freq_bar_dict, self.live_road)
@@ -119,6 +167,12 @@ class live_analysis:
 
     # 直播小结功能
     def __everyday_live_stats(self, my_default_time, my_live_data_group_by_id):
+        """
+
+        :param my_default_time: 开播时间
+        :param my_live_data_group_by_id: 根据uid分组的直播数据
+        :return: 输出直播小结
+        """
         every_day_table_name = "every_day_stats"
         self.__create_everyday_sql(every_day_table_name)
         user_data = compute_user_data(my_default_time, my_live_data_group_by_id, self.medal_list, self.uid_list)
@@ -127,8 +181,13 @@ class live_analysis:
 
     # 根据格式自动创造一个弹幕数据表
     def __create_everyday_sql(self, table_name):
+        """
+
+        :param table_name: 表名
+        :return: 创造一张everyday——stats表
+        """
         create_sql = "CREATE TABLE IF NOT EXISTS `%s` (" \
-                     "`live` varchar(255) not null, " \
+                     "`live` varchar(255) primary key not null, " \
                      "`gift` int not null, " \
                      "`avg_gift` float not null, " \
                      "`danmu` int not null, " \
@@ -161,6 +220,13 @@ class live_analysis:
 
     # 格式化每日数据到数据库
     def __input_stats_sql(self, user_stats, time_stats, table_name):
+        """
+
+        :param user_stats: 用户统计
+        :param time_stats: 直播间观看时长统计
+        :param table_name: 表名
+        :return: 存入sql
+        """
         gift = user_stats['all']['gift']
         avg_gift = user_stats['all']['gift'] / user_stats['all']['num']
         danmu = user_stats['all']['danmu']
@@ -326,6 +392,6 @@ def get_user_stats_data(my_data):
     return medal_sum, watch_time
 
 
-# room_id, live_date, live_road = lf.get_arg()
-live = live_analysis(room_id='22625025', live_date="2021_7_2", live_road="2021_7_2_22625025")
+room_id, live_date, live_road = lf.get_arg()
+live = live_analysis(room_id=room_id, live_date=live_date, live_road=live_road)
 live.get_everyday_live_stats()

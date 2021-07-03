@@ -1,0 +1,6 @@
+PyMySQL==1.0.2
+jieba==0.42.1
+aiowebsocket==1.0.0.dev2
+matplotlib==3.3.3
+numpy==1.19.4
+imageio==2.9.0

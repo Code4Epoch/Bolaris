@@ -173,6 +173,7 @@ class bilibili_live_data:
             entry:进入消息
             gift:送礼物，连击礼物消息
             guard:舰团消息
+            fans_change:粉丝变动
         time_stamp:消息的时间戳，如果该消息是不携带时间戳类型的消息取本地的时间戳
         text:消息的文本内容
         ul:如果消息中携带直播等级，记录，不携带不记录
@@ -312,8 +313,6 @@ class bilibili_live_data:
                     level_of_medal = 0
                     msg_type = "fans_change"
                     time_stamp = lf.ts2date(time.time())
-                    new_fans = 0
-                    new_medal_fans = 0
                     if self.new_fans_flag == 0:
                         text = "新增加了%s个粉丝，%s个粉丝团" % (new_fans, new_medal_fans)
                     else:

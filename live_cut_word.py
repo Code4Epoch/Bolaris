@@ -10,7 +10,7 @@ from imageio import imread
 import matplotlib.pyplot as plt
 import os
 
-jieba.load_userdict("./word_dict/asoul_word.txt")
+
 # 用来正常显示中文标签
 plt.rcParams['font.sans-serif'] = ['SimHei']
 # 用来正常显示负号
@@ -23,6 +23,7 @@ def get_word_dictionary(path):
     :param path: 停词词典的路径
     :return: 停词列表
     """
+    jieba.load_userdict("./word_dict/asoul_word.txt")
     with open("%s" % path, encoding='utf-8') as word_file:
         stop_word = word_file.read()
         stop_word_list = stop_word.split(sep=',')
@@ -147,7 +148,7 @@ def make_wordcloud(my_word_freq_dict, path, road):
     save_path = "./output/%s/" % road
     if os.path.exists(save_path) is False:
         os.makedirs(save_path)
-    wc.to_file(save_path + "wordcloud.jpg")
+    wc.to_file(save_path + "wordcloud.png")
 
 
 def make_word_freq_bar(my_word_freq_dict, road):
