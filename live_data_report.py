@@ -1,22 +1,24 @@
 """
 @author:zzh
-@update_time:2021_7_3
+@update_time:2021_7_9
 """
 import pymysql
 import live_function as lf
 import live_cut_word as lcw
 import make_picture as mp
+import make_excel as me
 
 
 class live_analysis:
 
-    def __init__(self, room_id, live_date, live_road):
+    def __init__(self, my_room_id, my_live_date, my_live_road, my_live_type):
         # 配置属性
-        self.live_date = live_date
-        self.room_id = room_id
-        self.live_road = live_road
+        self.live_date = my_live_date
+        self.room_id = my_room_id
+        self.live_road = my_live_road
+        self.live_type = my_live_type
 
-        self.config = lf.get_config("./live/config.txt")
+        self.config = lf.get_config("live/config.json")
         if len(self.config['medal_room_id']) > 1:
             self.live_monitor_type = 'muti'
             self.medal_list = self.config['medal_room_id']
@@ -51,6 +53,8 @@ class live_analysis:
         self.fans_sql_road = self.live_road + "_fans"
         self.everyday_stats_sql_road = self.live_road + "_stats"
 
+        self.line_color = self.config['line_color']
+
     def get_everyday_live_stats(self):
         """
         本函数的功能是将data处理为各种形式以供分析
@@ -77,9 +81,8 @@ class live_analysis:
         live_flag = 'not_live'
         default_time = 0
         for i in all_data.__iter__():
-            # print(i)
             if i[0] != 'start' and i[0] != 'end':
-                user_key = (i[0], i[1])
+                user_key = (i[0], )
                 if live_flag == 'not_live':
                     if user_key not in not_live_data_group_by_id:
                         not_live_data_group_by_id[user_key] = [i]
@@ -106,14 +109,121 @@ class live_analysis:
             elif i[0] == 'end':
                 live_flag = 'not_live'
 
-        #  1.生成直播小结
-        self.__everyday_live_stats(default_time, live_data_group_by_id)
+        #  1.生成直播小结、营收饼图
+        user_stats, user_data = self.__everyday_live_stats(default_time, live_data_group_by_id)
 
         # 2.生成词频图 词云图
         self.__wordfreq_wordcloud(live_data_group_by_type)
 
         # 3.生成舰长图、礼物图、粉丝图、进入图、营收图、同接图、sc图、弹幕图
         self.__make_stats_picture(all_data)
+
+        # 4.生成直播饼图
+        self.__make_revenue_picture(user_stats)
+
+        # 5.存储fans数据到m'ysql
+        self.__fans_stats2sql(user_data, live_data_group_by_id)
+
+    # 粉丝数据存入mysql
+    def __fans_stats2sql(self, my_user_stats, my_live_data_group_by_id):
+        self.__create_fans_table(self.fans_sql_road)
+
+        sql_model = "insert into %s " + self.config['mysql_config']['sql_sentence']['fans_header'] \
+                    + " " + self.config['mysql_config']['sql_sentence']['fans_values']
+
+        pay_dict = {}
+        gift_dict = lf.read_bilibili_gift_price("live/gift_price.json")
+        for user_key, msg_list in my_live_data_group_by_id.items():
+            pay_key = user_key[0]
+            pay = 0
+            for msg in msg_list:
+                gift_price = 0
+                if msg[4] == 'sc':
+                    gift_price = msg[-3]
+                elif msg[4] == 'gift':
+                    temp_gift = msg[6].split(sep=' * ')
+                    if temp_gift[0] == '小心心' or temp_gift[0] == '辣条':
+                        continue
+                    try:
+                        gift_num = int(temp_gift[1])
+                    except Exception:
+                        gift_num = 1
+                    try:
+                        gift_price = float(gift_dict[temp_gift[0]])
+                    except Exception:
+                        gift_price = 0
+                    try:
+                        temp_price = gift_price * gift_num
+                    except Exception:
+                        temp_price = 0
+                    gift_price = temp_price
+                elif msg[4] == 'guard':
+                    if msg[-2] == 10003:
+                        gift_price = 138
+                    elif msg[-2] == 10002:
+                        gift_price = 1998
+                    elif msg[-2] == 10001:
+                        gift_price = 19998
+                pay += gift_price
+
+            pay_dict[pay_key] = pay
+
+        for user, msg in my_user_stats.items():
+            uid = user[0]
+            watch_time = msg['watch_time']
+            danmu_times = msg['msg_times']['danmu']
+            gift_times = msg['msg_times']['gift']
+            sc_times = msg['msg_times']['sc']
+            guard_times = msg['msg_times']['guard']
+            medal_id = int(msg['medal']['id'])
+            medal_level = int(msg['medal']['level'])
+            interact_times = danmu_times + gift_times + sc_times + guard_times
+            pay = pay_dict[uid]
+            insert_sql = sql_model % (self.fans_sql_road, str(uid), watch_time, interact_times,
+                                      danmu_times, gift_times, sc_times, guard_times, pay, medal_id, medal_level)
+
+            try:
+                with self.mysql_conn.cursor() as cur:
+                    cur.execute(insert_sql)
+                self.mysql_conn.commit()
+            except Exception as e:
+                self.mysql_conn.rollback()
+                print("Commit Failed!\n%s" % insert_sql)
+
+    # 根据格式自动创造一个弹幕数据表
+    def __create_fans_table(self, table_name):
+        """
+
+        :param table_name: 表名
+        :return: 建表
+        """
+        create_sql = "CREATE TABLE IF NOT EXISTS `%s` (" \
+                     "`uid` varchar(255) primary key," \
+                     "`watch_time` float not null," \
+                     "`interact_times` int not null," \
+                     "`danmu_times` int not null," \
+                     "`gift_times` int not null," \
+                     "`sc_times` int not null," \
+                     "`guard_times` int not null," \
+                     "`pay` float not null," \
+                     "`medal_id` int not null," \
+                     "`medal_level` int not null)" \
+                     "CHARSET=utf8" % table_name
+        try:
+            self.mysql_conn.cursor().execute(create_sql)
+        except Exception:
+            print(create_sql)
+
+    # 生成营收饼图，收入分布，营收数据存入每日统计数据库
+    def __make_revenue_picture(self, my_user_stats):
+        """
+        :param my_user_stats:user统计字典
+        :return: 输出图片
+        """
+        revenue_type_dict = my_user_stats['all']['revenue']['gift_type']
+        revenue_price_dict = my_user_stats['all']['revenue']['gift_price']
+        mp.make_revenue_pie(revenue_price_dict, "按金额分", self.live_road)
+        mp.make_revenue_pie(revenue_type_dict, "按类型分", self.live_road)
 
     # 生成各种图片
     def __make_stats_picture(self, my_all_data):
@@ -128,27 +238,29 @@ class live_analysis:
             for my_type, num in min_stats.items():
                 new_stats_list[my_type].append(num)
         # 礼物图   1mins
-        mp.make_min_picture(new_stats_list['gift'], 1, '送礼人次', self.live_road, 1)
+        mp.make_min_picture(new_stats_list['gift'], 1, '送礼人次', self.live_road, 1, self.line_color[self.room_id])
+        # mp.new_make_min_picture(new_stats_list['gift'], 1, '送礼人次', self.live_road, 1, self.line_color[self.room_id])
         # 弹幕图   1mins
-        mp.make_min_picture(new_stats_list['danmu'], 1, '弹幕数量', self.live_road, 1)
+        mp.make_min_picture(new_stats_list['danmu'], 1, '弹幕数量', self.live_road, 1, self.line_color[self.room_id])
         # sc图    3mins
         sc_data = mp.trans_mins_sum(1, 3, new_stats_list['sc'])
-        mp.make_min_picture(sc_data, 3, 'sc数量', self.live_road, 1)
+        mp.make_min_picture(sc_data, 3, 'sc数量', self.live_road, 1, self.line_color[self.room_id])
         # guard图 3mins
         guard_data = mp.trans_mins_sum(1, 3, new_stats_list['guard'])
-        mp.make_min_picture(guard_data, 3, '舰团数量', self.live_road, 1)
+        mp.make_min_picture(guard_data, 3, '舰团数量', self.live_road, 1, self.line_color[self.room_id])
         # entry图 1mins
-        mp.make_min_picture(new_stats_list['entry'], 1, '入场人次', self.live_road, 1)
+        mp.make_min_picture(new_stats_list['entry'], 1, '入场人次', self.live_road, 1, self.line_color[self.room_id])
         # 营收图   1mins
-        mp.make_min_picture(new_stats_list['revenue'], 1, '营收', self.live_road, 1)
+        mp.make_min_picture(new_stats_list['revenue'], 1, '营收', self.live_road, 1, self.line_color[self.room_id])
         # fans图  3mins
         new_fans_data = mp.trans_mins_sum(1, 3, new_stats_list['new_fans'])
-        mp.make_min_picture(new_fans_data, 3, '新增粉丝', self.live_road, 1)
+        mp.make_min_picture(new_fans_data, 3, '新增粉丝', self.live_road, 1, self.line_color[self.room_id])
         # 粉丝团图 3mins
         new_medal_fans_data = mp.trans_mins_sum(1, 3, new_stats_list['new_medal_fans'])
-        mp.make_min_picture(new_medal_fans_data, 3, '新增粉丝团', self.live_road, 1)
+        mp.make_min_picture(new_medal_fans_data, 3, '新增粉丝团', self.live_road, 1, self.line_color[self.room_id])
         # 同接图   1mins
-        mp.make_min_picture(new_stats_list['simu_interact'], 1, '10分钟同接', self.live_road, 0)
+        mp.make_min_picture(new_stats_list['simu_interact'], 1,
+                            '10分钟同接', self.live_road, 0, self.line_color[self.room_id])
 
     # 词频、词云图生成
     def __wordfreq_wordcloud(self, my_live_data_group_by_type):
@@ -160,10 +272,11 @@ class live_analysis:
         word_freq_dic = lcw.get_word_freq_dic(my_live_data_group_by_type)
         word_freq_bar_num = 20
         word_freq_bar_dict = lcw.customize_word_freq_dict(word_freq_dic, word_freq_bar_num)
-        lcw.make_word_freq_bar(word_freq_bar_dict, self.live_road)
+        mp.make_word_freq_bar(word_freq_bar_dict, self.live_road, self.line_color[self.room_id])
+        # mp.pc_make_word_freq_bar(word_freq_bar_dict, self.live_road)
         word_cloud_num = 600
         word_cloud_dict = lcw.customize_word_freq_dict(word_freq_dic, word_cloud_num)
-        lcw.make_wordcloud(word_cloud_dict, ('./image/wordcloud/%s' % self.room_id), self.live_road)
+        mp.make_wordcloud(word_cloud_dict, ('./image/wordcloud/%s' % self.room_id), self.live_road)
 
     # 直播小结功能
     def __everyday_live_stats(self, my_default_time, my_live_data_group_by_id):
@@ -177,7 +290,10 @@ class live_analysis:
         self.__create_everyday_sql(every_day_table_name)
         user_data = compute_user_data(my_default_time, my_live_data_group_by_id, self.medal_list, self.uid_list)
         user_stats, time_stats = get_user_stats_data(user_data)
+        user_stats = self.__get_revenue(user_stats)
         self.__input_stats_sql(user_stats, time_stats, every_day_table_name)
+        me.make_excel(self.mysql_conn, "./model/everyday_stats_excel.xls", self.live_road)
+        return user_stats, user_data
 
     # 根据格式自动创造一个弹幕数据表
     def __create_everyday_sql(self, table_name):
@@ -214,7 +330,16 @@ class live_analysis:
                      "`medal_11_20_avg_danmu` float not null," \
                      "`medal_21_num` int not null, " \
                      "`medal_21_avg_react` float not null, " \
-                     "`medal_21_avg_danmu` float not null)" \
+                     "`medal_21_avg_danmu` float not null," \
+                     "`revenue` float not null," \
+                     "`sc_revenue` float not null," \
+                     "`gift_revenue` float not null," \
+                     "`guard_revenue` float not null," \
+                     "`_10revenue` float not null," \
+                     "`_10_100revenue` float not null," \
+                     "`_100revenue` float not null," \
+                     "`avg_revenue` float not null," \
+                     "`live_type` varchar(30))" \
                      "CHARSET=utf8" % table_name
         self.mysql_conn.cursor().execute(create_sql)
 
@@ -242,7 +367,7 @@ class live_analysis:
         medal_0_num = user_stats['medal_0']['num']
         medal_0_avg_react = user_stats['medal_0']['react'] / medal_0_num
         medal_0_avg_danmu = user_stats['medal_0']['danmu'] / medal_0_num
-        medal_1_5_num = user_stats['medal_0']['num']
+        medal_1_5_num = user_stats['medal_1_5']['num']
         medal_1_5_avg_react = user_stats['medal_1_5']['react'] / medal_1_5_num
         medal_1_5_avg_danmu = user_stats['medal_1_5']['danmu'] / medal_1_5_num
         medal_6_10_num = user_stats['medal_6_10']['num']
@@ -254,32 +379,112 @@ class live_analysis:
         medal_21_num = user_stats['medal_21']['num']
         medal_21_avg_react = user_stats['medal_21']['react'] / medal_21_num
         medal_21_avg_danmu = user_stats['medal_21']['danmu'] / medal_21_num
+        revenue = user_stats['all']['revenue']['gift_type']['sc'] + user_stats['all']['revenue']['gift_type']['guard'] \
+                  + user_stats['all']['revenue']['gift_type']['gift']
+        sc_revenue = user_stats['all']['revenue']['gift_type']['sc']
+        guard_revenue = user_stats['all']['revenue']['gift_type']['guard']
+        gift_revenue = user_stats['all']['revenue']['gift_type']['gift']
+        _10_revenue = user_stats['all']['revenue']['gift_price']['<10revenue']
+        _10_100_revenue = user_stats['all']['revenue']['gift_price']['>=10&<100revenue']
+        _100_revenue = user_stats['all']['revenue']['gift_price']['>100revenue']
+        avg_revenue = revenue / entry_num
 
         insert_sql = "insert into " + table_name + "(live, gift, avg_gift, danmu, avg_danmu, sc, " \
-                                                             "guard, entry, avg_watch_time, " \
-                                                             "avg_react_watch_time, entry_num, react_num, " \
-                                                             "medal_num, " \
-                                                             "medal_0_num, medal_0_avg_react, " \
-                                                             "medal_0_avg_danmu," \
-                                                             "medal_1_5_num, medal_1_5_avg_react, " \
-                                                             "medal_1_5_avg_danmu," \
-                                                             "medal_6_10_num, medal_6_10_avg_react, " \
-                                                             "medal_6_10_avg_danmu," \
-                                                             "medal_11_20_num, medal_11_20_avg_react, " \
-                                                             "medal_11_20_avg_danmu," \
-                                                             "medal_21_num, medal_21_avg_react, " \
-                                                             "medal_21_avg_danmu) values('%s','%d','%f','%d'," \
-                                                             "'%f','%d','%d','%d','%f','%f','%d','%d','%d'," \
-                                                             "'%d', '%f', '%f'," \
-                                                             "'%d','%f','%f','%d','%f','%f','%d','%f','%f'," \
-                                                             "'%d','%f','%f')" % (
+                                                   "guard, entry, avg_watch_time, " \
+                                                   "avg_react_watch_time, entry_num, react_num, " \
+                                                   "medal_num, " \
+                                                   "medal_0_num, medal_0_avg_react, " \
+                                                   "medal_0_avg_danmu," \
+                                                   "medal_1_5_num, medal_1_5_avg_react, " \
+                                                   "medal_1_5_avg_danmu," \
+                                                   "medal_6_10_num, medal_6_10_avg_react, " \
+                                                   "medal_6_10_avg_danmu," \
+                                                   "medal_11_20_num, medal_11_20_avg_react, " \
+                                                   "medal_11_20_avg_danmu," \
+                                                   "medal_21_num, medal_21_avg_react, " \
+                                                   "medal_21_avg_danmu, revenue,sc_revenue,gift_revenue," \
+                                                   "guard_revenue, _10revenue, _10_100revenue, _100revenue, " \
+                                                   "avg_revenue, live_type) values('%s','%d','%f','%d'," \
+                                                   "'%f','%d','%d','%d','%f','%f','%d','%d','%d'," \
+                                                   "'%d', '%f', '%f','%d','%f','%f'" \
+                                                   ",'%d','%f','%f','%d','%f','%f'," \
+                                                   "'%d','%f','%f','%f','%f','%f','%f','%f','%f','%f','%f', '%s')" % (
                          self.live_road, gift, avg_gift, danmu, avg_danmu, sc, guard, entry, avg_watch_time,
                          avg_react_watch_time, entry_num, react_num, medal_num, medal_0_num, medal_0_avg_react,
                          medal_0_avg_danmu, medal_1_5_num, medal_1_5_avg_react, medal_1_5_avg_danmu, medal_6_10_num,
                          medal_6_10_avg_react, medal_6_10_avg_danmu, medal_11_20_num, medal_11_20_avg_react,
-                         medal_11_20_avg_danmu, medal_21_num, medal_21_avg_react, medal_21_avg_danmu)
-        self.mysql_conn.cursor().execute(insert_sql)
-        self.mysql_conn.commit()
+                         medal_11_20_avg_danmu, medal_21_num, medal_21_avg_react, medal_21_avg_danmu, revenue,
+                         sc_revenue, gift_revenue, guard_revenue, _10_revenue, _10_100_revenue, _100_revenue,
+                         avg_revenue, self.live_type)
+        try:
+            self.mysql_conn.cursor().execute(insert_sql)
+            self.mysql_conn.commit()
+        except Exception:
+            print(insert_sql)
+            print("commit failed")
+
+    # 获取营收数据存入字典
+    def __get_revenue(self, user_stats):
+        sql = "select * from %s where msg_type = '%s' or msg_type = '%s' " \
+              "or msg_type = '%s' or msg_type = '' " % (self.dm_sql_road, 'gift', 'sc', 'guard')
+        cur = self.mysql_conn.cursor()
+        cur.execute(sql)
+        gift_data = cur.fetchall()
+        revenue_data = {'gift_type': {'sc': 0, 'guard': 0, 'gift': 0},
+                        'gift_price': {'<10revenue': 0, '>=10&<100revenue': 0, '>100revenue': 0}}
+        start_flg = 0
+        gift_dict = lf.read_bilibili_gift_price("live/gift_price.json")
+        for gift_msg in gift_data:
+            if start_flg == 0 and gift_msg[0] != 'start':
+                continue
+            elif start_flg == 0 and gift_msg[0] == 'start':
+                start_flg = 1
+            elif start_flg == 1 and gift_msg[0] != 'end':
+                gift_price = 0
+                gift_type = 'default'
+                if gift_msg[4] == 'sc':
+                    gift_price = gift_msg[-3]
+                    gift_type = 'sc'
+                elif gift_msg[4] == 'gift':
+                    temp_gift = gift_msg[6].split(sep=' * ')
+                    gift_type = 'gift'
+                    if temp_gift[0] == '小心心' or temp_gift[0] == '辣条':
+                        pass
+                    else:
+                        gift_num = 0
+                        try:
+                            gift_num = int(temp_gift[1])
+                        except Exception:
+                            gift_num = 1
+                        try:
+                            gift_price = float(gift_dict[temp_gift[0]])
+                        except Exception:
+                            gift_price = 0
+                        try:
+                            temp_price = gift_price * gift_num
+                        except Exception:
+                            temp_price = 0
+                        if temp_price == 0:
+                            continue
+                        else:
+                            gift_price = temp_price
+                elif gift_msg[4] == 'guard':
+                    gift_type = 'guard'
+                    if gift_msg[-2] == 10003:
+                        gift_price = 138
+                    elif gift_msg[-2] == 10002:
+                        gift_price = 1998
+                    elif gift_msg[-2] == 10001:
+                        gift_price = 19998
+                revenue_data['gift_type'][gift_type] += gift_price
+                if gift_price < 10:
+                    revenue_data['gift_price']['<10revenue'] += gift_price
+                elif gift_price < 100:
+                    revenue_data['gift_price']['>=10&<100revenue'] += gift_price
+                else:
+                    revenue_data['gift_price']['>100revenue'] += gift_price
+        user_stats['all']['revenue'] = revenue_data
+        return user_stats
 
 
 def compute_user_data(my_default_time, my_data, my_medal_list, my_uid_list):
@@ -292,6 +497,7 @@ def compute_user_data(my_default_time, my_data, my_medal_list, my_uid_list):
     """
 
     uid2room = {}
+    new_data = {}
     for k in my_medal_list.keys():
         uid2room[my_uid_list[k]] = my_medal_list[k]
 
@@ -346,9 +552,8 @@ def compute_user_data(my_default_time, my_data, my_medal_list, my_uid_list):
         user_data['watch_time'] = watch_time / 60
         user_data['medal'] = target_medal
 
-        my_data[k] = user_data
-
-    return my_data
+        new_data[k] = user_data
+    return new_data
 
 
 def get_user_stats_data(my_data):
@@ -392,6 +597,6 @@ def get_user_stats_data(my_data):
     return medal_sum, watch_time
 
 
-room_id, live_date, live_road = lf.get_arg()
-live = live_analysis(room_id=room_id, live_date=live_date, live_road=live_road)
+room_id, live_date, live_road, live_type = lf.get_arg()
+live = live_analysis(my_room_id=room_id, my_live_date=live_date, my_live_road=live_road, my_live_type=live_type)
 live.get_everyday_live_stats()

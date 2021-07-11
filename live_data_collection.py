@@ -1,6 +1,6 @@
 """
 @author:zzh
-@update_time:2021_7_2
+@update_time:2021_7_9
 """
 from __future__ import unicode_literals
 
@@ -29,7 +29,7 @@ class bilibili_live_data:
         else:
             print("initialize error, please input a string")
             raise ValueError
-        self.config = lf.get_config("./live/config.txt")
+        self.config = lf.get_config("live/config.json")
         if len(self.config['medal_room_id']) > 1:
             self.live_monitor_type = 'muti'
             self.medal_list = self.config['medal_room_id']
@@ -326,6 +326,7 @@ class bilibili_live_data:
                     elif self.live_status == 'live' and py_data['cmd'] == 'PREPARING':
                         self.live_status = 'preparing'
                         uid = 'end'
+                        self.new_fans_flag = 1
                         # self.__send_live_analysis()
                         print('[Notice] live end')
                     else:

@@ -1,0 +1,55 @@
+﻿{
+    "room_id":
+        {
+        "向晚大魔王":"22625025",
+        "贝拉kira":"22632424",
+        "嘉然今天吃什么":"22637261",
+        "珈乐Carol":"22634198",
+        "乃琳Queen":"22625027",
+        "A-SOUL_Official":"22632157"
+        },
+    "target_id":
+        {
+        "向晚大魔王":"672346917",
+        "贝拉kira":"672353429",
+        "嘉然今天吃什么":"672328094",
+        "珈乐Carol":"351609538",
+        "乃琳Queen":"672342685",
+        "A-SOUL_Official":"703007996"
+        },
+    "medal_room_id":
+        {
+        "向晚大魔王":"22625025",
+        "贝拉kira":"22632424",
+        "嘉然今天吃什么":"22637261",
+        "珈乐Carol":"22634198",
+        "乃琳Queen":"22625027",
+        "A-SOUL_Official":"22632157"
+        },
+    "mysql_config":
+        {
+        "host":"127.0.0.1",
+        "port":3306,
+        "user":"root",
+        "password":"292513",
+        "db":"asoul_live",
+        "sql_sentence":{
+                        "dm_road":"%s_%s_%s_%s_dm",
+                        "dm_header":"(uid, user_name, room_id_of_medal, level_of_medal, msg_type, time_stamp, text, ul, sc_price, gift_ID, fans_type)",
+                        "dm_values":"VALUES ('%s','%s','%s','%d','%s','%s','%s','%d','%d','%d','%d')",
+                        "rq_road":"%s_%s_%s_%s_rq",
+                        "rq_header":"(time_stamp, popularity)",
+                        "rq_values":"VALUES (%s, %d)",
+                        "fans_road":"%s_%s_%s_%s_rq",
+                        "fans_header":"(uid, watch_time, interact_times, danmu_times, gift_times, sc_times, guard_times, pay, medal_id, medal_level)",
+                        "fans_values":"VALUES ('%s', '%.2f', '%d', '%d', '%d', '%d', '%d', '%.2f', '%d', '%d')"
+        }
+        },
+    "bilibili_config":{
+                        "remote":"wss://broadcastlv.chat.bilibili.com:2245/sub",
+                        "data_raw":"000000{headerLen}0010000100000007000000017b22726f6f6d6964223a{room_id}7d",
+                        "heart_beat":"00000010001000010000000200000001",
+                        "heart_beat_time":15,
+                        "error_time":3
+                        }
+}

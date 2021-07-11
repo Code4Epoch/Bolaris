@@ -1,14 +1,9 @@
 """
 @author:zzh、lucien
-@update_time:2021_7_3
+@update_time:2021_7_9
 """
 import jieba
-import wordcloud
-import numpy as np
-from wordcloud import WordCloud, ImageColorGenerator
-from imageio import imread
 import matplotlib.pyplot as plt
-import os
 
 
 # 用来正常显示中文标签
@@ -24,6 +19,7 @@ def get_word_dictionary(path):
     :return: 停词列表
     """
     jieba.load_userdict("./word_dict/asoul_word.txt")
+    jieba.suggest_freq('一个魂要天天开心', tune=True)
     with open("%s" % path, encoding='utf-8') as word_file:
         stop_word = word_file.read()
         stop_word_list = stop_word.split(sep=',')
@@ -125,48 +121,6 @@ def get_word_freq_dic(my_live_data_group_by_type):
     return word_freq_dict
 
 
-def make_wordcloud(my_word_freq_dict, path, road):
-    """
-
-    :param my_word_freq_dict: 词频字典
-    :param path: 寻图路径不带格式
-    :param road: 存图路径 为日期和房间号
-    :return:
-    """
-    img = imread('%s.jpg' % path)
-    image_colors = ImageColorGenerator(img)
-    mask_img = np.array(img)
-    wc = wordcloud.WordCloud(font_path="C:\Windows\Fonts\msyh.ttc",
-                             mask=mask_img,
-                             width=1000,
-                             height=700,
-                             background_color=None,
-                             mode="RGBA")
-    wc.generate_from_frequencies(my_word_freq_dict)
-    plt.imshow(wc.recolor(color_func=image_colors))
-    plt.clf()
-    save_path = "./output/%s/" % road
-    if os.path.exists(save_path) is False:
-        os.makedirs(save_path)
-    wc.to_file(save_path + "wordcloud.png")
-
-
-def make_word_freq_bar(my_word_freq_dict, road):
-    """
-
-    :param my_word_freq_dict: 词频字典
-    :param road: 文件目录
-    :return:
-    """
-    plt.bar(my_word_freq_dict.keys(), my_word_freq_dict.values())
-    plt.xticks(rotation=300)
-    save_path = './output/%s/' % road
-    if os.path.exists(save_path) is False:
-        os.makedirs(save_path)
-    plt.savefig(save_path + "word_freq.png")
-    plt.clf()
-
-
 def customize_word_freq_dict(my_word_freq_dict, my_word_num):
     """
 
@@ -180,5 +134,6 @@ def customize_word_freq_dict(my_word_freq_dict, my_word_num):
     for word, count in my_word_freq_dict.items():
         if count >= min_num:
             new_dict[word] = count
+
     return new_dict
 
