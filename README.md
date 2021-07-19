@@ -53,7 +53,7 @@
        my_live_monitor = live_data_collection.bilibili_live_data(live_room_id)
        my_live_monitor.live_monitor()
    
-   room_id = '22625025'     //这里是你要爬取的房间id
+   room_id = '22625025'     #这里是你要爬取的房间id
    live_monitor(room_id)
    ```
 
