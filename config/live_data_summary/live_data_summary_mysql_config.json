@@ -1,0 +1,51 @@
+{
+  "room_id":
+  {
+    "向晚大魔王":"22625025",
+    "贝拉kira":"22632424",
+    "嘉然今天吃什么":"22637261",
+    "珈乐Carol":"22634198",
+    "乃琳Queen":"22625027",
+    "A-SOUL_Official":"22632157"
+  },
+  "target_id":
+  {
+    "向晚大魔王":"672346917",
+    "贝拉kira":"672353429",
+    "嘉然今天吃什么":"672328094",
+    "珈乐Carol":"351609538",
+    "乃琳Queen":"672342685",
+    "A-SOUL_Official":"703007996"
+  },
+  "medal_room_id":
+  {
+    "向晚大魔王":"22625025",
+    "贝拉kira":"22632424",
+    "嘉然今天吃什么":"22637261",
+    "珈乐Carol":"22634198",
+    "乃琳Queen":"22625027",
+    "A-SOUL_Official":"22632157"
+  },
+  "mysql_config":
+    {
+        "host":"127.0.0.1",
+        "port":3306,
+        "user":"root",
+        "password":"123456",
+        "db":"live",
+        "sql_sentence":{
+                        "fans_road":"%s_%s_%s_%s_rq",
+                        "fans_header":"(uid, watch_time, interact_times, danmu_times, gift_times, sc_times, guard_times, pay, medal_id, medal_level)",
+                        "fans_values":"VALUES ('%s', '%.2f', '%d', '%d', '%d', '%d', '%d', '%.2f', '%d', '%d')"
+        }
+    },
+  "line_color":
+  {
+    "22625025": "#9AC8E2",
+    "22632424": "#DB7D74",
+    "22634198": "#B8A6D9",
+    "22637261": "#E799B0",
+    "22625027": "#576690",
+    "other":  "#000000"
+  }
+}
