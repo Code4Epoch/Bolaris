@@ -12,7 +12,7 @@
 # ------------------------------------------------------------------
 from __future__ import unicode_literals
 
-from live import tool_function as tf
+import tool_function as tf
 from aiowebsocket.converses import AioWebSocket
 import asyncio
 import json
