@@ -43,7 +43,7 @@
 1. 安装pip库，在目录下命令行
 
    ```
-   pip install -r requirement.txt
+   pip install -r requirements.txt
    ```
 
 2. 修改live/config.txt中room_id（你所关心的直播间号）、target_id（你所关心的主播的UID）、medal
