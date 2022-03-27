@@ -1,0 +1,13 @@
+imageio==2.9.0
+PyMySQL==0.9.3
+numpy==1.22.3
+pyecharts==1.9.0
+requests==2.25.1
+Brotli==1.0.9
+wordcloud==1.8.1
+jieba==0.42.1
+snapshot_pyppeteer==0.0.2
+matplotlib==3.3.3
+hanlp==2.1.0b17
+aiohttp==3.7.4.post0
+Pillow==9.0.1

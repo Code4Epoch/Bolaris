@@ -1,0 +1,10 @@
+{
+  "host":"127.0.0.1",
+  "port":3306,
+  "user":"root",
+  "password":"your_password",
+  "dbname":"you_dbname",
+  "sel_sql_data": "SELECT uid, user_name, room_id_of_medal, level_of_medal, msg_type, time_stamp, text, ul, sc_price, gift_ID, gift_price, fans_type FROM %s ORDER BY time_stamp asc",
+  "create_sql": "CREATE TABLE IF NOT EXISTS daily_statistics (live varchar(255) primary key not null,max_renqi int not null,max_watched int not null,max_simu_interact int not null,max_min_danmu int not null, gift int not null, danmu int not null, avg_danmu float not null, sc int not null, guard int not null, avg_watch_time float not null, avg_react_watch_time float not null, entry_num int not null, medal_num int not null, react_num int not null, medal_0_num int not null, medal_0_avg_react float not null, medal_0_avg_danmu float not null, medal_1_5_num int not null, medal_1_5_avg_react float not null, medal_1_5_avg_danmu float not null, medal_6_10_num int not null, medal_6_10_avg_react float not null, medal_6_10_avg_danmu float not null,medal_11_20_num int not null, medal_11_20_avg_react float not null, medal_11_20_avg_danmu float not null,medal_21_num int not null, medal_21_avg_react float not null, medal_21_avg_danmu float not null,revenue float not null,sc_revenue float not null,gift_revenue float not null,guard_revenue float not null,avg_revenue float not null,live_type varchar(30) not null,live_long varchar(30) not null)CHARSET=utf8",
+  "stats_sql": "insert into daily_statistics (live, max_renqi, max_watched, max_simu_interact, max_min_danmu , gift, danmu, avg_danmu, sc, guard, avg_watch_time, avg_react_watch_time, entry_num, react_num, medal_num, medal_0_num, medal_0_avg_react, medal_0_avg_danmu,medal_1_5_num, medal_1_5_avg_react, medal_1_5_avg_danmu,medal_6_10_num, medal_6_10_avg_react, medal_6_10_avg_danmu,medal_11_20_num, medal_11_20_avg_react, medal_11_20_avg_danmu,medal_21_num, medal_21_avg_react, medal_21_avg_danmu, revenue,sc_revenue,gift_revenue,guard_revenue,avg_revenue, live_type, live_long) values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+}

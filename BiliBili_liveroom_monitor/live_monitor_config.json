@@ -1,0 +1,11 @@
+{
+  "bilibili_config":{
+    "remote":"wss://broadcastlv.chat.bilibili.com:443/sub",
+    "heart_beat_time":30,
+    "error_time":3
+  },
+  "bilibili_api": {
+    "room_conf_url" : "https://api.live.bilibili.com/room/v1/Danmu/getConf?room_id=%s",
+    "room_info_url" : "https://api.live.bilibili.com/xlive/web-room/v1/index/getRoomPlayInfo?room_id=%s"
+  }
+}

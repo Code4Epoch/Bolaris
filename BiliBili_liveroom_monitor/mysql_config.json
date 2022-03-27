@@ -1,0 +1,10 @@
+{
+  "host":"127.0.0.1",
+  "port":3306,
+  "user":"root",
+  "password":"your_password",
+  "dbname":"you_dbname",
+  "insert_pt1": "INSERT INTO %s (uid, user_name, room_id_of_medal, level_of_medal, msg_type, time_stamp, text, ul, sc_price, gift_ID, gift_price, fans_type)",
+  "insert_pt2": " VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+  "insert_road":"%s_%s_%s_%s_dm"
+}
